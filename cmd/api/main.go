@@ -1,11 +1,6 @@
 package main
+import "github.com/RahulVervebot/go_cicd_demo/internal/handlers"
 
-import (
-	"log"
-	"net/http"
-
-	"git@github.com:RahulVervebot/go_cicd_demo.git/internal/handlers"
-)
 
 func main() {
 	mux := http.NewServeMux()
