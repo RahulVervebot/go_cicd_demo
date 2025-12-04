@@ -13,7 +13,7 @@ func Register(mux *http.ServeMux) {
 }
 
 func health(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, resp{"status": "ok"})
+	writeJSON(w, http.StatusOK, resp{"statuss": "ok"})
 }
 
 func hello(w http.ResponseWriter, r *http.Request) {
