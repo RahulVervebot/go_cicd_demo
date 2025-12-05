@@ -1,14 +1,23 @@
-name: Go CI
+name: CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
+
+permissions:
+  contents: read
 
 jobs:
-  test-build:
-    runs-on: ubuntu-latest
+  test:
+    name: Go ${{ matrix.go-version }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        go-version: ["1.24.x"]
 
     steps:
       - name: Checkout
@@ -17,23 +26,34 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.22"
+          go-version: ${{ matrix.go-version }}
           cache: true
 
-      - name: Go fmt check
+      - name: Go version
+        run: go version
+
+      - name: Tidy
+        run: go mod tidy
+
+      - name: Format check
+        shell: bash
         run: |
-          UNFORMATTED=$(gofmt -l .)
-          if [ -n "$UNFORMATTED" ]; then
+          set -euo pipefail
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
             echo "These files are not gofmt'd:"
-            echo "$UNFORMATTED"
+            echo "$unformatted"
             exit 1
           fi
 
-      - name: Go vet
+      - name: Vet
         run: go vet ./...
 
-      - name: Go test
-        run: go test ./... -v
+      - name: Test (with coverage)
+        run: go test ./... -race -coverprofile=coverage.out
 
-      - name: Go build
-        run: go build -v ./cmd/api
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.os }}
+          path: coverage.out
