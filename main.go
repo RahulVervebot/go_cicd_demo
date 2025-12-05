@@ -10,7 +10,7 @@ import (
 
 func main() {
 	if len(os.Args) < 3 {
-		fmt.Println("Usage: go_cicd_demo <a> <b>")
+		fmt.Println("Usage: go_cicd_demo <b>")
 		os.Exit(2)
 	}
 
