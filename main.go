@@ -9,17 +9,23 @@ func main() {
 	sum := add(a, b)
 	fmt.Printf("Add: %d + %d = %d\n", a, b, sum)
 
+	// Multiplication added in feat/add-mul branch
+	mul := multiply(a, b)
+	fmt.Printf("Mul: %d * %d = %d\n", a, b, mul)
+
 	// NOTE:
-	// - Branch feat/add-mul will add multiplication here.
-	// - Branch feat/add-div will add division here.
-	// Both branches will modify this SAME area, so we can see merge conflicts.
+	// Branch feat/add-div will try to add division in this same area.
+	// That will cause a merge conflict once both branches are merged.
 }
 
 func add(a, b int) int {
 	return a + b
 }
 
-// You can also later add subtraction on main branch if you want:
 func subtract(a, b int) int {
 	return a - b
+}
+
+func multiply(a, b int) int {
+	return a * b
 }
