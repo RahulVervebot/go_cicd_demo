@@ -1,29 +1,25 @@
 package main
 
-import (
-	"fmt"
-	"os"
-	"strconv"
+import "fmt"
 
-	"github.com/RahulVervebot/go_cicd_demo/internal/calc"
-)
-
+// Simple calculator demo to play with Git conflicts.
 func main() {
-	if len(os.Args) < 3 {
-		fmt.Println("Usage: go_cicd_demo <a> <b>")
-		os.Exit(2)
-	}
+	a, b := 10, 5
 
-	a, err := strconv.Atoi(os.Args[1])
-	if err != nil {
-		fmt.Println("invalid a:", err)
-		os.Exit(2)
-	}
-	b, err := strconv.Atoi(os.Args[2])
-	if err != nil {
-		fmt.Println("invalid b:", err)
-		os.Exit(2)
-	}
+	sum := add(a, b)
+	fmt.Printf("Add: %d + %d = %d\n", a, b, sum)
 
-	fmt.Printf("%d + %d = %d\n", a, b, calc.Add(a, b))
+	// NOTE:
+	// - Branch feat/add-mul will add multiplication here.
+	// - Branch feat/add-div will add division here.
+	// Both branches will modify this SAME area, so we can see merge conflicts.
+}
+
+func add(a, b int) int {
+	return a + b
+}
+
+// You can also later add subtraction on main branch if you want:
+func subtract(a, b int) int {
+	return a - b
 }
