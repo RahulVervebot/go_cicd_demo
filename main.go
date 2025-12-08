@@ -1,7 +1,7 @@
 package main
 
 import "fmt"
-
+// lets test it is working or not
 // Simple calculator demo to play with Git conflicts.
 func main() {
 	a, b := 10, 5
@@ -12,10 +12,6 @@ func main() {
 	// Division added in feat/add-div branch
 	div := divide(a, b)
 	fmt.Printf("Div: %d / %d = %d\n", a, b, div)
-
-	// NOTE:
-	// Multiplication was added in feat/add-mul on the SAME block.
-	// When we merge this branch to main, Git will see different changes
 }
 
 func add(a, b int) int {
