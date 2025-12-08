@@ -9,13 +9,14 @@ func main() {
 	sum := add(a, b)
 	fmt.Printf("Add: %d + %d = %d\n", a, b, sum)
 
-	// Multiplication added in feat/add-mul branch
-	mul := multiply(a, b)
-	fmt.Printf("Mul: %d * %d = %d\n", a, b, mul)
+	// Division added in feat/add-div branch
+	div := divide(a, b)
+	fmt.Printf("Div: %d / %d = %d\n", a, b, div)
 
 	// NOTE:
-	// Branch feat/add-div will try to add division in this same area.
-	// That will cause a merge conflict once both branches are merged.
+	// Multiplication was added in feat/add-mul on the SAME block.
+	// When we merge this branch to main, Git will see different changes
+	// in the same lines → MERGE CONFLICT.
 }
 
 func add(a, b int) int {
@@ -24,4 +25,11 @@ func add(a, b int) int {
 
 func subtract(a, b int) int {
 	return a - b
+}
+
+func divide(a, b int) int {
+	if b == 0 {
+		panic("cannot divide by zero")
+	}
+	return a / b
 }
