@@ -13,9 +13,6 @@ func main() {
 	mul := multiply(a, b)
 	fmt.Printf("Mul: %d * %d = %d\n", a, b, mul)
 
-	// NOTE:
-	// Branch feat/add-div will try to add division in this same area.
-	// That will cause a merge conflict once both branches are merged.
 }
 
 func add(a, b int) int {
