@@ -16,7 +16,6 @@ func main() {
 	// NOTE:
 	// Multiplication was added in feat/add-mul on the SAME block.
 	// When we merge this branch to main, Git will see different changes
-	// in the same lines → MERGE CONFLICT.
 }
 
 func add(a, b int) int {
