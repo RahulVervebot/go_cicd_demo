@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         // change to your target integration branch
-        TARGET_BRANCH = "develop"
+        TARGET_BRANCH = "main"
         GIT_CREDENTIALS_ID = "github-creds"  // configure in Jenkins
         ADMIN_EMAIL = "rahul.singhh.144@gmail.com"
     }
