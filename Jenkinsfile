@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        TARGET_BRANCH = "develop"
+        TARGET_BRANCH = "main"
         GIT_CREDENTIALS_ID = "github-creds"
         ADMIN_EMAIL = "rahul.singhh.144@gmail.com"
     }
