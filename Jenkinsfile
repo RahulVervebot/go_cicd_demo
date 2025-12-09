@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         TARGET_BRANCH = "main"
-        GIT_CREDENTIALS_ID = "github-creds"
+        GIT_CREDENTIALS_ID = "89234a08-e7f5-4916-a0c5-a08bf859b95d"
         ADMIN_EMAIL = "rahul.singhh.144@gmail.com"
     }
 
