@@ -2,8 +2,8 @@ pipeline {
     agent any
 
     environment {
-        TARGET_BRANCH = "main"
-        GIT_CREDENTIALS_ID = "89234a08-e7f5-4916-a0c5-a08bf859b95d"
+        TARGET_BRANCH = "develop"
+        GIT_CREDENTIALS_ID = "github-creds"
         ADMIN_EMAIL = "rahul.singhh.144@gmail.com"
     }
 
@@ -16,14 +16,26 @@ pipeline {
         stage('Info') {
             steps {
                 script {
-                    echo "Building branch: ${env.BRANCH_NAME}"
+                    // BRANCH_NAME for multibranch, GIT_BRANCH for classic
+                    def branch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: "unknown"
+                    // GIT_BRANCH is often like 'origin/main', so we can clean it:
+                    branch = branch.replaceFirst(/^origin\//, "")
+                    echo "Building branch: ${branch}"
+
+                    // Optionally store cleaned branch in env for later
+                    env.EFFECTIVE_BRANCH = branch
                 }
             }
         }
 
         stage('Checkout') {
             when {
-                expression { env.BRANCH_NAME.startsWith("feat/") }
+                expression { 
+                    def branch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: ""
+                    branch = branch.replaceFirst(/^origin\//, "")
+                    // Only run for feature branches:
+                    return branch.startsWith("feat/")
+                }
             }
             steps {
                 checkout scm
@@ -32,7 +44,11 @@ pipeline {
 
         stage('Run tests') {
             when {
-                expression { env.BRANCH_NAME.startsWith("feat/") }
+                expression { 
+                    def branch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: ""
+                    branch = branch.replaceFirst(/^origin\//, "")
+                    branch.startsWith("feat/")
+                }
             }
             steps {
                 sh 'go test ./...'
@@ -41,7 +57,11 @@ pipeline {
 
         stage('Attempt merge into target branch') {
             when {
-                expression { env.BRANCH_NAME.startsWith("feat/") }
+                expression { 
+                    def branch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: ""
+                    branch = branch.replaceFirst(/^origin\//, "")
+                    branch.startsWith("feat/")
+                }
             }
             steps {
                 script {
@@ -54,7 +74,7 @@ pipeline {
                       git checkout -B ${TARGET_BRANCH} origin/${TARGET_BRANCH}
 
                       set +e
-                      git merge --no-commit --no-ff origin/${env.BRANCH_NAME}
+                      git merge --no-commit --no-ff origin/${env.EFFECTIVE_BRANCH}
                       MERGE_STATUS=\$?
                       set -e
 
@@ -64,7 +84,7 @@ pipeline {
                         exit 99
                       fi
 
-                      git commit -m "auto merge ${env.BRANCH_NAME} into ${TARGET_BRANCH}"
+                      git commit -m "auto merge ${env.EFFECTIVE_BRANCH} into ${TARGET_BRANCH}"
                     """
                 }
             }
@@ -72,14 +92,18 @@ pipeline {
 
         stage('Push merged target branch') {
             when {
-                expression { env.BRANCH_NAME.startsWith("feat/") }
+                expression { 
+                    def branch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: ""
+                    branch = branch.replaceFirst(/^origin\//, "")
+                    branch.startsWith("feat/")
+                }
             }
             steps {
                 withCredentials([usernamePassword(credentialsId: env.GIT_CREDENTIALS_ID,
                                                  usernameVariable: 'GIT_USER',
                                                  passwordVariable: 'GIT_PASS')]) {
                     sh """
-                      git push https://$GIT_USER:$GIT_PASS@github.com/YOUR_USER/go_cicd_demo.git ${TARGET_BRANCH}
+                      git push https://$GIT_USER:$GIT_PASS@github.com/RahulVervebot/go_cicd_demo.git ${TARGET_BRANCH}
                     """
                 }
             }
@@ -91,8 +115,8 @@ pipeline {
             script {
                 emailext(
                     to: "${ADMIN_EMAIL}",
-                    subject: "Merge failed for ${env.BRANCH_NAME}",
-                    body: "Merge conflict or error occurred."
+                    subject: "Merge failed for branch ${env.EFFECTIVE_BRANCH ?: (env.BRANCH_NAME ?: env.GIT_BRANCH)}",
+                    body: "Merge conflict or error occurred. Check job ${env.JOB_NAME} build #${env.BUILD_NUMBER}"
                 )
             }
         }
