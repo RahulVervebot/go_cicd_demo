@@ -1,8 +1,9 @@
 package main
-
 import "fmt"
 
+// lets test it is working or not
 // Simple calculator demo to play with Git conflicts.
+
 func main() {
 	a, b := 10, 5
 	sum := add(a, b)
@@ -25,11 +26,4 @@ func subtract(a, b int) int {
 
 func multiply(a, b int) int {
 	return a * b
-}
-
-func divide(a, b int) int {
-	if b == 0 {
-		panic("cannot divide by zero")
-	}
-	return a / b
 }
