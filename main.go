@@ -9,7 +9,6 @@ func main() {
 	sum := add(a, b)
 	fmt.Printf("Add: %d + %d = %d\n", a, b, sum)
 
-	// Division added in feat/add-div branch
 	div := divide(a, b)
 	fmt.Printf("Div: %d / %d = %d\n", a, b, div)
 }
