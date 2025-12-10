@@ -5,10 +5,8 @@ func main() {
 	a, b := 10, 5
 	sum := add(a, b)
 	fmt.Printf("Add: %d + %d = %d\n", a, b, sum)
-
-	div := divide(a, b)
-	fmt.Printf("Div: %d / %d = %d\n", a, b, div)
-
+	mul := multiply(a, b)
+	fmt.Printf("Mul: %d * %d = %d\n", a, b, mul)
 }
 
 func add(a, b int) int {
