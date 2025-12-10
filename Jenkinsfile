@@ -1,12 +1,9 @@
 pipeline {
+
     agent any
 
     environment {
-<<<<<<< HEAD
-        TARGET_BRANCH = "develop"
-=======
         TARGET_BRANCH = "main"
->>>>>>> feat/add-mul
         GIT_CREDENTIALS_ID = "github-creds"
         ADMIN_EMAIL = "rahul.singhh.144@gmail.com"
     }
@@ -25,7 +22,6 @@ pipeline {
                     // GIT_BRANCH is often like 'origin/main', so we can clean it:
                     branch = branch.replaceFirst(/^origin\//, "")
                     echo "Building branch: ${branch}"
-
                     // Optionally store cleaned branch in env for later
                     env.EFFECTIVE_BRANCH = branch
                 }
@@ -125,4 +121,5 @@ pipeline {
             }
         }
     }
+    
 }
