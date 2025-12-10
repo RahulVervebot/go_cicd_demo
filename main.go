@@ -1,6 +1,6 @@
 package main
 import "fmt"
-// Simple calculator demo to play with Git conflicts.
+
 func main() {
 	a, b := 10, 5
 	sum := add(a, b)
