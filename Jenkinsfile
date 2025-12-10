@@ -2,7 +2,11 @@ pipeline {
     agent any
 
     environment {
+<<<<<<< HEAD
         TARGET_BRANCH = "develop"
+=======
+        TARGET_BRANCH = "main"
+>>>>>>> feat/add-mul
         GIT_CREDENTIALS_ID = "github-creds"
         ADMIN_EMAIL = "rahul.singhh.144@gmail.com"
     }
