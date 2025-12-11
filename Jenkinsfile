@@ -18,7 +18,6 @@ pipeline {
         stage('Info') {
             steps {
                 script {
-                  
                     def branch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: "unknown"
                     // Clean up origin/main style
                     branch = branch.replaceFirst(/^origin\//, "")
