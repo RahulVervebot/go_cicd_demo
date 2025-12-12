@@ -18,7 +18,6 @@ pipeline {
         stage('Info') {
             steps {
                 script {
-                    // BRANCH_NAME for multibranch, GIT_BRANCH for classic
                     def branch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: "unknown"
                     // Clean up origin/main style
                     branch = branch.replaceFirst(/^origin\//, "")
@@ -136,10 +135,9 @@ Build: #${env.BUILD_NUMBER}
 
 The changes from ${branch} have been merged into ${TARGET_BRANCH} and pushed to GitHub.
 """
-                )
-            }
-        }
-
+)
+}
+}
         failure {
             script {
                 def branch = env.EFFECTIVE_BRANCH ?: (env.BRANCH_NAME ?: env.GIT_BRANCH ?: "unknown")
