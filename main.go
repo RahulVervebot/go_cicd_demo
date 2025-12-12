@@ -1,4 +1,5 @@
 package main
+
 import "fmt"
 
 func main() {
@@ -8,7 +9,6 @@ func main() {
 
 	div := divide(a, b)
 	fmt.Printf("Div: %d / %d = %d\n", a, b, div)
-
 }
 
 func add(a, b int) int {
@@ -18,6 +18,7 @@ func add(a, b int) int {
 func subtract(a, b int) int {
 	return a - b
 }
+
 func multiple(a, b int) int {
 	if b == 0 {
 		panic("cannot divide by zero")
