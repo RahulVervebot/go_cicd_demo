@@ -3,7 +3,7 @@ pipeline {
 
   environment {
     TARGET_BRANCH      = "main"
-    GIT_CREDENTIALS_ID = "github-creds"
+    GIT_CREDENTIALS_ID = "6f9dfd84-7cc3-412e-8c73-b6c8bd1a3291	"
     ADMIN_EMAIL        = "rahul.singhh.144@gmail.com"
   }
 
@@ -33,7 +33,7 @@ pipeline {
     stage('Run tests') {
       when { expression { (env.EFFECTIVE_BRANCH ?: "").startsWith("feat/") } }
       steps {
-        // If you add go.mod, switch to: sh 'go test ./...'
+        // If you add go.mod
         sh '''
           set -e
           if [ -f go.mod ]; then
@@ -103,65 +103,73 @@ pipeline {
       }
     }
 
-    stage('Push main') {
-      when { expression { (env.EFFECTIVE_BRANCH ?: "").startsWith("feat/") } }
-      steps {
-        withCredentials([usernamePassword(credentialsId: env.GIT_CREDENTIALS_ID,
-          usernameVariable: 'GIT_USER',
-          passwordVariable: 'GIT_PASS')]) {
+stage('Push main') {
+  when { expression { (env.EFFECTIVE_BRANCH ?: "").startsWith("feat/") } }
+  steps {
+    withCredentials([usernamePassword(credentialsId: env.GIT_CREDENTIALS_ID,
+      usernameVariable: 'GIT_USER',
+      passwordVariable: 'GIT_PASS')]) {
 
-          sh """
-            git push https://$GIT_USER:$GIT_PASS@github.com/RahulVervebot/go_cicd_demo.git ${TARGET_BRANCH}
-          """
-        }
-      }
+      sh '''
+        set -e
+
+        # Create an askpass helper so git can read creds safely (no URL injection)
+        cat > .git_askpass.sh <<'EOF'
+#!/bin/sh
+case "$1" in
+  *Username*) echo "$GIT_USER" ;;
+  *Password*) echo "$GIT_PASS" ;;
+  *) echo "" ;;
+esac
+EOF
+        chmod +x .git_askpass.sh
+
+        export GIT_ASKPASS="$PWD/.git_askpass.sh"
+        export GIT_TERMINAL_PROMPT=0
+
+        # Ensure origin is the normal URL (no creds embedded)
+        git remote set-url origin https://github.com/RahulVervebot/go_cicd_demo.git
+
+        git push origin main
+
+        rm -f .git_askpass.sh
+      '''
     }
   }
+}
 
-  post {
-    success {
-      script {
-        def branch = env.EFFECTIVE_BRANCH ?: "unknown"
-        if (!branch.startsWith("feat/")) return
+  }
 
-        emailext(
-          to: "${ADMIN_EMAIL}",
-          subject: "Auto-merge SUCCESS: ${branch} -> ${TARGET_BRANCH}",
-          body: """Merged successfully.
+ post {
+  failure {
+    script {
+      // Always try to detect branch, but NEVER skip emailing because of it
+      def branch = (env.EFFECTIVE_BRANCH ?: env.BRANCH_NAME ?: env.GIT_BRANCH ?: "unknown")
+      branch = branch.replaceFirst(/^origin\//, "")
 
-Feature branch: ${branch}
-Target branch:  ${TARGET_BRANCH}
+      def mergeOutput  = fileExists('merge_output.txt')  ? readFile('merge_output.txt')  : ""
+      def rebaseOutput = fileExists('rebase_output.txt') ? readFile('rebase_output.txt') : ""
 
-Job:   ${env.JOB_NAME}
-Build: #${env.BUILD_NUMBER}
-"""
-        )
+      // try to get committer email (may fail if checkout failed)
+      def authorEmail = ""
+      try {
+        authorEmail = sh(script: "git log -1 --pretty=format:%ae || true", returnStdout: true).trim()
+      } catch (e) {
+        authorEmail = ""
       }
-    }
 
-    failure {
-      script {
-        def branch = env.EFFECTIVE_BRANCH ?: (env.BRANCH_NAME ?: env.GIT_BRANCH ?: "unknown")
-        branch = branch.replaceFirst(/^origin\//, "")
-        if (!branch.startsWith("feat/")) return
+      def recipients = "${ADMIN_EMAIL}"
+      if (authorEmail) recipients = "${recipients}, ${authorEmail}"
 
-        def rebaseOutput = fileExists('rebase_output.txt') ? readFile('rebase_output.txt') : ""
-        def mergeOutput  = fileExists('merge_output.txt')  ? readFile('merge_output.txt')  : ""
+      def note = branch.startsWith("feat/") ? "" : "\nNOTE: This branch is not feat/* (or branch unknown). Email still sent.\n"
 
-        def authorEmail = sh(script: "git log -1 --pretty=format:%ae || echo ''", returnStdout: true).trim()
+      emailext(
+        to: recipients,
+        subject: "Jenkins FAILED: ${branch} (target: ${TARGET_BRANCH})",
+        body: """Build failed.${note}
 
-        def recipients = "${ADMIN_EMAIL}"
-        if (authorEmail) recipients = "${recipients}, ${authorEmail}"
-
-        emailext(
-          to: recipients,
-          subject: "Auto-merge FAILED: ${branch} -> ${TARGET_BRANCH}",
-          body: """Auto-merge failed.
-
-Feature branch: ${branch}
-Target branch:  ${TARGET_BRANCH}
-
-Job:   ${env.JOB_NAME}
+Branch: ${branch}
+Job: ${env.JOB_NAME}
 Build: #${env.BUILD_NUMBER}
 
 --- Rebase output ---
@@ -169,9 +177,11 @@ ${rebaseOutput}
 
 --- Merge output ---
 ${mergeOutput}
+
+Console: ${env.BUILD_URL}console
 """
-        )
-      }
+      )
     }
   }
+}
 }
