@@ -118,50 +118,36 @@ pipeline {
     }
   }
 
-  post {
-    success {
-      script {
-        def branch = env.EFFECTIVE_BRANCH ?: "unknown"
-        if (!branch.startsWith("feat/")) return
+ post {
+  failure {
+    script {
+      // Always try to detect branch, but NEVER skip emailing because of it
+      def branch = (env.EFFECTIVE_BRANCH ?: env.BRANCH_NAME ?: env.GIT_BRANCH ?: "unknown")
+      branch = branch.replaceFirst(/^origin\//, "")
 
-        emailext(
-          to: "${ADMIN_EMAIL}",
-          subject: "Auto-merge SUCCESS: ${branch} -> ${TARGET_BRANCH}",
-          body: """Merged successfully.
+      def mergeOutput  = fileExists('merge_output.txt')  ? readFile('merge_output.txt')  : ""
+      def rebaseOutput = fileExists('rebase_output.txt') ? readFile('rebase_output.txt') : ""
 
-Feature branch: ${branch}
-Target branch:  ${TARGET_BRANCH}
-
-Job:   ${env.JOB_NAME}
-Build: #${env.BUILD_NUMBER}
-"""
-        )
+      // try to get committer email (may fail if checkout failed)
+      def authorEmail = ""
+      try {
+        authorEmail = sh(script: "git log -1 --pretty=format:%ae || true", returnStdout: true).trim()
+      } catch (e) {
+        authorEmail = ""
       }
-    }
 
-    failure {
-      script {
-        def branch = env.EFFECTIVE_BRANCH ?: (env.BRANCH_NAME ?: env.GIT_BRANCH ?: "unknown")
-        branch = branch.replaceFirst(/^origin\//, "")
-        if (!branch.startsWith("feat/")) return
+      def recipients = "${ADMIN_EMAIL}"
+      if (authorEmail) recipients = "${recipients}, ${authorEmail}"
 
-        def rebaseOutput = fileExists('rebase_output.txt') ? readFile('rebase_output.txt') : ""
-        def mergeOutput  = fileExists('merge_output.txt')  ? readFile('merge_output.txt')  : ""
+      def note = branch.startsWith("feat/") ? "" : "\nNOTE: This branch is not feat/* (or branch unknown). Email still sent.\n"
 
-        def authorEmail = sh(script: "git log -1 --pretty=format:%ae || echo ''", returnStdout: true).trim()
+      emailext(
+        to: recipients,
+        subject: "Jenkins FAILED: ${branch} (target: ${TARGET_BRANCH})",
+        body: """Build failed.${note}
 
-        def recipients = "${ADMIN_EMAIL}"
-        if (authorEmail) recipients = "${recipients}, ${authorEmail}"
-
-        emailext(
-          to: recipients,
-          subject: "Auto-merge FAILED: ${branch} -> ${TARGET_BRANCH}",
-          body: """Auto-merge failed.
-
-Feature branch: ${branch}
-Target branch:  ${TARGET_BRANCH}
-
-Job:   ${env.JOB_NAME}
+Branch: ${branch}
+Job: ${env.JOB_NAME}
 Build: #${env.BUILD_NUMBER}
 
 --- Rebase output ---
@@ -169,9 +155,11 @@ ${rebaseOutput}
 
 --- Merge output ---
 ${mergeOutput}
+
+Console: ${env.BUILD_URL}console
 """
-        )
-      }
+      )
     }
   }
+}
 }
