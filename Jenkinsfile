@@ -118,48 +118,39 @@ pipeline {
     }
   }
 
- post {
-  failure {
-    script {
-      // Always try to detect branch, but NEVER skip emailing because of it
-      def branch = (env.EFFECTIVE_BRANCH ?: env.BRANCH_NAME ?: env.GIT_BRANCH ?: "unknown")
-      branch = branch.replaceFirst(/^origin\//, "")
+stage('Push main') {
+  when { expression { (env.EFFECTIVE_BRANCH ?: "").startsWith("feat/") } }
+  steps {
+    withCredentials([usernamePassword(credentialsId: env.GIT_CREDENTIALS_ID,
+      usernameVariable: 'GIT_USER',
+      passwordVariable: 'GIT_PASS')]) {
 
-      def mergeOutput  = fileExists('merge_output.txt')  ? readFile('merge_output.txt')  : ""
-      def rebaseOutput = fileExists('rebase_output.txt') ? readFile('rebase_output.txt') : ""
+      sh '''
+        set -e
 
-      // try to get committer email (may fail if checkout failed)
-      def authorEmail = ""
-      try {
-        authorEmail = sh(script: "git log -1 --pretty=format:%ae || true", returnStdout: true).trim()
-      } catch (e) {
-        authorEmail = ""
-      }
+        # Create an askpass helper so git can read creds safely (no URL injection)
+        cat > .git_askpass.sh <<'EOF'
+#!/bin/sh
+case "$1" in
+  *Username*) echo "$GIT_USER" ;;
+  *Password*) echo "$GIT_PASS" ;;
+  *) echo "" ;;
+esac
+EOF
+        chmod +x .git_askpass.sh
 
-      def recipients = "${ADMIN_EMAIL}"
-      if (authorEmail) recipients = "${recipients}, ${authorEmail}"
+        export GIT_ASKPASS="$PWD/.git_askpass.sh"
+        export GIT_TERMINAL_PROMPT=0
 
-      def note = branch.startsWith("feat/") ? "" : "\nNOTE: This branch is not feat/* (or branch unknown). Email still sent.\n"
+        # Ensure origin is the normal URL (no creds embedded)
+        git remote set-url origin https://github.com/RahulVervebot/go_cicd_demo.git
 
-      emailext(
-        to: recipients,
-        subject: "Jenkins FAILED: ${branch} (target: ${TARGET_BRANCH})",
-        body: """Build failed.${note}
+        git push origin main
 
-Branch: ${branch}
-Job: ${env.JOB_NAME}
-Build: #${env.BUILD_NUMBER}
-
---- Rebase output ---
-${rebaseOutput}
-
---- Merge output ---
-${mergeOutput}
-
-Console: ${env.BUILD_URL}console
-"""
-      )
+        rm -f .git_askpass.sh
+      '''
     }
   }
 }
+
 }
