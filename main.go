@@ -19,13 +19,6 @@ func subtract(a, b int) int {
 	return a - b
 }
 
-func multiple(a, b int) int {
-	if b == 0 {
-		panic("cannot divide by zero")
-	}
-	return a * b
-}
-
 func divide(a, b int) int {
 	if b == 0 {
 		panic("cannot divide by zero")
