@@ -37,10 +37,10 @@ pipeline {
         sh '''
           set -e
           if [ -f go.mod ]; then
-            go main.go ./...
+            go main ./...
           else
             echo "go.mod not found; running go test in current package only"
-            go main.go ./
+            go main ./
           fi
         '''
       }
