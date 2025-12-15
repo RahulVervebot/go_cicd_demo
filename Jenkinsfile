@@ -33,7 +33,7 @@ pipeline {
     stage('Run tests') {
       when { expression { (env.EFFECTIVE_BRANCH ?: "").startsWith("feat/") } }
       steps {
-        // If you add go.mod, switch to: sh 'go test ./...'
+        // If you add go.mod
         sh '''
           set -e
           if [ -f go.mod ]; then
