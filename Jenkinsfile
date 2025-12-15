@@ -3,11 +3,7 @@ pipeline {
 
   environment {
     TARGET_BRANCH      = "main"
-<<<<<<< HEAD
-    GIT_CREDENTIALS_ID = "github-creds"
-=======
     GIT_CREDENTIALS_ID = "6f9dfd84-7cc3-412e-8c73-b6c8bd1a3291	"
->>>>>>> main
     ADMIN_EMAIL        = "rahul.singhh.144@gmail.com"
   }
 
@@ -37,11 +33,7 @@ pipeline {
     stage('Run tests') {
       when { expression { (env.EFFECTIVE_BRANCH ?: "").startsWith("feat/") } }
       steps {
-<<<<<<< HEAD
-        // If you add go.mod, switch to: sh 'go test ./...'
-=======
         // If you add go.mod
->>>>>>> main
         sh '''
           set -e
           if [ -f go.mod ]; then
@@ -82,96 +74,6 @@ pipeline {
         }
       }
     }
-<<<<<<< HEAD
-
-    stage('Merge rebased feature into main') {
-      when { expression { (env.EFFECTIVE_BRANCH ?: "").startsWith("feat/") } }
-      steps {
-        script {
-          sh """
-            git fetch origin
-
-            # Checkout latest main
-            git checkout -B ${TARGET_BRANCH} origin/${TARGET_BRANCH}
-
-            # Merge the (rebased) feature branch
-            set +e
-            git merge --no-ff ${env.EFFECTIVE_BRANCH} > merge_output.txt 2>&1
-            MERGE_STATUS=\$?
-            set -e
-
-            if [ "\$MERGE_STATUS" -ne 0 ]; then
-              echo "Merge conflict detected!"
-              git merge --abort || true
-              exit 99
-            fi
-
-            git log -1 --oneline
-          """
-        }
-      }
-    }
-
-    stage('Push main') {
-      when { expression { (env.EFFECTIVE_BRANCH ?: "").startsWith("feat/") } }
-      steps {
-        withCredentials([usernamePassword(credentialsId: env.GIT_CREDENTIALS_ID,
-          usernameVariable: 'GIT_USER',
-          passwordVariable: 'GIT_PASS')]) {
-
-          sh """
-            git push https://$GIT_USER:$GIT_PASS@github.com/RahulVervebot/go_cicd_demo.git ${TARGET_BRANCH}
-          """
-        }
-      }
-    }
-  }
-
- post {
-  failure {
-    script {
-      // Always try to detect branch, but NEVER skip emailing because of it
-      def branch = (env.EFFECTIVE_BRANCH ?: env.BRANCH_NAME ?: env.GIT_BRANCH ?: "unknown")
-      branch = branch.replaceFirst(/^origin\//, "")
-
-      def mergeOutput  = fileExists('merge_output.txt')  ? readFile('merge_output.txt')  : ""
-      def rebaseOutput = fileExists('rebase_output.txt') ? readFile('rebase_output.txt') : ""
-
-      // try to get committer email (may fail if checkout failed)
-      def authorEmail = ""
-      try {
-        authorEmail = sh(script: "git log -1 --pretty=format:%ae || true", returnStdout: true).trim()
-      } catch (e) {
-        authorEmail = ""
-      }
-
-      def recipients = "${ADMIN_EMAIL}"
-      if (authorEmail) recipients = "${recipients}, ${authorEmail}"
-
-      def note = branch.startsWith("feat/") ? "" : "\nNOTE: This branch is not feat/* (or branch unknown). Email still sent.\n"
-
-      emailext(
-        to: recipients,
-        subject: "Jenkins FAILED: ${branch} (target: ${TARGET_BRANCH})",
-        body: """Build failed.${note}
-
-Branch: ${branch}
-Job: ${env.JOB_NAME}
-Build: #${env.BUILD_NUMBER}
-
---- Rebase output ---
-${rebaseOutput}
-
---- Merge output ---
-${mergeOutput}
-
-Console: ${env.BUILD_URL}console
-"""
-      )
-    }
-  }
-}
-=======
 
     stage('Merge rebased feature into main') {
       when { expression { (env.EFFECTIVE_BRANCH ?: "").startsWith("feat/") } }
@@ -282,5 +184,4 @@ Console: ${env.BUILD_URL}console
     }
   }
 }
->>>>>>> main
 }
