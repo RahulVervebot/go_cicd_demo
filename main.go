@@ -8,6 +8,11 @@ func main() {
 	fmt.Printf("Add: %d + %d = %d\n", a, b, sum)	
 	mul := multiply(a, b)
 	fmt.Printf("Mul: %d * %d = %d\n", a, b, mul)}
+	fmt.Printf("Add: %d + %d = %d\n", a, b, sum)
+	div := divide(a, b)
+	fmt.Printf("Div: %d / %d = %d\n", a, b, div)
+}
+
 
 func add(a, b int) int {
 	return a + b
