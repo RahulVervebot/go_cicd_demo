@@ -50,52 +50,72 @@ pipeline {
     stage('Rebase feature onto latest main') {
       when { expression { (env.EFFECTIVE_BRANCH ?: "").startsWith("feat/") } }
       steps {
-        sh """
-          set -e
-          git config user.name "jenkins-bot"
-          git config user.email "jenkins-bot@example.com"
+        script {
+          int status = sh(
+            script: """#!/bin/bash -e
+git config user.name "jenkins-bot"
+git config user.email "jenkins-bot@example.com"
 
-          git fetch origin
+git fetch origin
 
-          git checkout -B ${env.EFFECTIVE_BRANCH} origin/${env.EFFECTIVE_BRANCH}
+git checkout -B ${env.EFFECTIVE_BRANCH} origin/${env.EFFECTIVE_BRANCH}
 
-          set +e
-          git rebase origin/${TARGET_BRANCH} > rebase_output.txt 2>&1
-          REBASE_STATUS=\$?
-          set -e
+set +e
+git rebase origin/${TARGET_BRANCH} > rebase_output.txt 2>&1
+REBASE_STATUS=\$?
+set -e
 
-          if [ "\$REBASE_STATUS" -ne 0 ]; then
-            echo "Rebase conflict detected!"
-            git rebase --abort || true
-            exit 98
-          fi
-        """
+if [ "\$REBASE_STATUS" -ne 0 ]; then
+  echo "Rebase conflict detected!"
+  git rebase --abort || true
+  exit 98
+fi
+""",
+            returnStatus: true
+          )
+
+          if (status == 98) {
+            error("Rebase conflict detected between ${env.EFFECTIVE_BRANCH} and ${TARGET_BRANCH}. See rebase_output.txt for details.")
+          } else if (status != 0) {
+            error("Rebase stage failed with exit code ${status}")
+          }
+        }
       }
     }
 
     stage('Merge rebased feature into main') {
       when { expression { (env.EFFECTIVE_BRANCH ?: "").startsWith("feat/") } }
       steps {
-        sh """
-          set -e
-          git fetch origin
+        script {
+          int status = sh(
+            script: """#!/bin/bash -e
+git fetch origin
 
-          git checkout -B ${TARGET_BRANCH} origin/${TARGET_BRANCH}
+git checkout -B ${TARGET_BRANCH} origin/${TARGET_BRANCH}
 
-          set +e
-          git merge --no-ff ${env.EFFECTIVE_BRANCH} > merge_output.txt 2>&1
-          MERGE_STATUS=\$?
-          set -e
+set +e
+git merge --no-ff ${env.EFFECTIVE_BRANCH} > merge_output.txt 2>&1
+MERGE_STATUS=\$?
+set -e
 
-          if [ "\$MERGE_STATUS" -ne 0 ]; then
-            echo "Merge conflict detected!"
-            git merge --abort || true
-            exit 99
-          fi
+if [ "\$MERGE_STATUS" -ne 0 ]; then
+  echo "Merge conflict detected!"
+  git merge --abort || true
+  exit 99
+fi
 
-          echo "Merge commit:"
-          git log -1 --oneline
-        """
+echo "Merge commit:"
+git log -1 --oneline
+""",
+            returnStatus: true
+          )
+
+          if (status == 99) {
+            error("Merge conflict detected when merging ${env.EFFECTIVE_BRANCH} into ${TARGET_BRANCH}. See merge_output.txt for details.")
+          } else if (status != 0) {
+            error("Merge stage failed with exit code ${status}")
+          }
+        }
       }
     }
 
