@@ -157,8 +157,8 @@ EOF
         } catch (e) {
           authorEmail = ""
         }
-
-        def recipients = "${ADMIN_EMAIL}"
+        def dev = (env.DEVELOPER_EMAIL ?: "").trim()
+        def recipients = dev ? "${ADMIN_EMAIL}, ${dev}" : "${ADMIN_EMAIL}"
         if (authorEmail) recipients = "${recipients}, ${authorEmail}"
 
         emailext(
@@ -182,7 +182,7 @@ Console: ${env.BUILD_URL}console
       script {
         def branch = (env.EFFECTIVE_BRANCH ?: env.BRANCH_NAME ?: env.GIT_BRANCH ?: "unknown")
         branch = branch.replaceFirst(/^origin\//, "")
-
+   
         def mergeOutput  = fileExists('merge_output.txt')  ? readFile('merge_output.txt')  : ""
         def rebaseOutput = fileExists('rebase_output.txt') ? readFile('rebase_output.txt') : ""
 
@@ -193,7 +193,8 @@ Console: ${env.BUILD_URL}console
           authorEmail = ""
         }
 
-        def recipients = "${ADMIN_EMAIL}"
+      def dev = (env.DEVELOPER_EMAIL ?: "").trim()
+        def recipients = dev ? "${ADMIN_EMAIL}, ${dev}" : "${ADMIN_EMAIL}"
         if (authorEmail) recipients = "${recipients}, ${authorEmail}"
 
         emailext(
