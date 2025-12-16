@@ -1,170 +1,131 @@
 pipeline {
-  agent any
 
-  environment {
-    TARGET_BRANCH      = "main"
-    // ✅ IMPORTANT: no trailing spaces/tabs in credentials id
-    GIT_CREDENTIALS_ID = "6f9dfd84-7cc3-412e-8c73-b6c8bd1a3291"
-    ADMIN_EMAIL        = "rahul.singhh.144@gmail.com"
-    REPO_URL           = "https://github.com/RahulVervebot/go_cicd_demo.git"
-  }
+    agent any
 
-  options {
-    disableConcurrentBuilds()
-    timestamps()
-  }
+    environment {
+        TARGET_BRANCH     = "main"
+        GIT_CREDENTIALS_ID = "github-creds"
+        ADMIN_EMAIL       = "rahul.singhh.144@gmail.com"
+    }
 
-  stages {
+    options {
+        disableConcurrentBuilds()
+        timestamps()
+    }
 
-    stage('Info') {
-      steps {
-        script {
-          def branch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: "unknown"
-          branch = branch.replaceFirst(/^origin\//, "")
-          env.EFFECTIVE_BRANCH = branch
-          echo "Building branch: ${env.EFFECTIVE_BRANCH}"
+    stages {
+
+        stage('Info') {
+            steps {
+                script {
+                    def branch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: "unknown"
+                    // Clean up origin/main style
+                    branch = branch.replaceFirst(/^origin\//, "")
+                    echo "Building branch: ${branch}"
+                    env.EFFECTIVE_BRANCH = branch
+                }
+            }
         }
-      }
-    }
 
-    stage('Checkout') {
-      when { expression { (env.EFFECTIVE_BRANCH ?: "").startsWith("feat/") } }
-      steps {
-        checkout scm
-      }
-    }
-
-    stage('Run tests') {
-      when { expression { (env.EFFECTIVE_BRANCH ?: "").startsWith("feat/") } }
-      steps {
-
-        sh '''
-          set -e
-          if [ -f go.mod ]; then
-            echo "go.mod found; running: go test ./..."
-            go test ./...
-          else
-            echo "go.mod not found; skipping tests (recommended: add go.mod and enable go test ./...)"
-          fi
-        '''
-      }
-    }
-
-
-
-stage('Attempt merge into main') {
-  when { expression { (env.EFFECTIVE_BRANCH ?: "").startsWith("feat/") } }
-  steps {
-    sh """
-      set -e
-      git config user.name "jenkins-bot"
-      git config user.email "jenkins-bot@example.com"
-
-      git fetch origin
-
-      # checkout latest main
-      git checkout -B ${TARGET_BRANCH} origin/${TARGET_BRANCH}
-
-      # try merge feature
-      set +e
-      git merge --no-ff origin/${env.EFFECTIVE_BRANCH} > merge_output.txt 2>&1
-      MERGE_STATUS=\$?
-      set -e
-
-      if [ "\$MERGE_STATUS" -ne 0 ]; then
-        echo "Merge conflict detected!"
-        git merge --abort || true
-        exit 99
-      fi
-    """
-  }
-}
-stage('Capture developer email') {
-  when { expression { (env.EFFECTIVE_BRANCH ?: "").startsWith("feat/") } }
-  steps {
-    script {
-      // make sure remote refs exist
-      sh "git fetch origin +refs/heads/*:refs/remotes/origin/*"
-
-      // email from the latest commit on the feature branch (NOT from main / NOT from jenkins merge commit)
-      def devEmail = sh(
-        script: "git show -s --format=%ae origin/${env.EFFECTIVE_BRANCH} || true",
-        returnStdout: true
-      ).trim()
-
-      if (!devEmail) {
-        devEmail = sh(
-          script: "git show -s --format=%ce origin/${env.EFFECTIVE_BRANCH} || true",
-          returnStdout: true
-        ).trim()
-      }
-
-      env.DEVELOPER_EMAIL = devEmail
-      echo "Developer email captured from origin/${env.EFFECTIVE_BRANCH}: ${env.DEVELOPER_EMAIL}"
-    }
-  }
-}
-
-
-    stage('Push main') {
-      when { expression { (env.EFFECTIVE_BRANCH ?: "").startsWith("feat/") } }
-      steps {
-        withCredentials([usernamePassword(
-          credentialsId: env.GIT_CREDENTIALS_ID,
-          usernameVariable: 'GIT_USER',
-          passwordVariable: 'GIT_PASS'
-        )]) {
-          sh '''
-            set -e
-
-            # Askpass helper so secrets aren't injected into the URL
-            cat > .git_askpass.sh <<'EOF'
-#!/bin/sh
-case "$1" in
-  *Username*) echo "$GIT_USER" ;;
-  *Password*) echo "$GIT_PASS" ;;
-  *) echo "" ;;
-esac
-EOF
-            chmod +x .git_askpass.sh
-
-            export GIT_ASKPASS="$PWD/.git_askpass.sh"
-            export GIT_TERMINAL_PROMPT=0
-
-            # Keep remote clean (no creds in URL)
-            git remote set-url origin "$REPO_URL"
-
-            git push origin main
-
-            rm -f .git_askpass.sh
-          '''
+        stage('Checkout') {
+            when {
+                expression {
+                    def branch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: ""
+                    branch = branch.replaceFirst(/^origin\//, "")
+                    return branch.startsWith("feat/")
+                }
+            }
+            steps {
+                checkout scm
+            }
         }
-      }
-    }
-  }
 
-  post {
-
-    success {
-      script {
-        def branch = (env.EFFECTIVE_BRANCH ?: env.BRANCH_NAME ?: env.GIT_BRANCH ?: "unknown")
-        branch = branch.replaceFirst(/^origin\//, "")
-
-        // committer email (developer)
-        def authorEmail = ""
-        try {
-          authorEmail = sh(script: "git log -1 --pretty=format:%ae || true", returnStdout: true).trim()
-        } catch (e) {
-          authorEmail = ""
+        stage('Run tests') {
+            when {
+                expression {
+                    def branch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: ""
+                    branch = branch.replaceFirst(/^origin\//, "")
+                    return branch.startsWith("feat/")
+                }
+            }
+            steps {
+                sh 'go test ./...'
+            }
         }
-        def dev = (env.DEVELOPER_EMAIL ?: "").trim()
-        def recipients = dev ? "${ADMIN_EMAIL}, ${dev}" : "${ADMIN_EMAIL}"
-        if (authorEmail) recipients = "${recipients}, ${authorEmail}"
 
-        emailext(
-          to: recipients,
-          subject: "Jenkins SUCCESS: ${branch} merged into ${TARGET_BRANCH}",
-          body: """Build & merge successful.
+        stage('Attempt merge into target branch') {
+            when {
+                expression {
+                    def branch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: ""
+                    branch = branch.replaceFirst(/^origin\//, "")
+                    return branch.startsWith("feat/")
+                }
+            }
+            steps {
+                script {
+                    sh """
+                      git config user.name "jenkins-bot"
+                      git config user.email "jenkins-bot@example.com"
+
+                      git fetch origin
+
+                      # Checkout latest target branch
+                      git checkout -B ${TARGET_BRANCH} origin/${TARGET_BRANCH}
+
+                      # Try merge and capture output
+                      set +e
+                      git merge --no-commit --no-ff origin/${env.EFFECTIVE_BRANCH} > merge_output.txt 2>&1
+                      MERGE_STATUS=\$?
+                      set -e
+
+                      if [ "\$MERGE_STATUS" -ne 0 ]; then
+                        echo "Conflict detected!"
+                        git merge --abort || true
+                        exit 99   # non-zero so Jenkins marks build as FAILURE
+                      fi
+
+                      git commit -m "auto merge ${env.EFFECTIVE_BRANCH} into ${TARGET_BRANCH}"
+                    """
+                }
+            }
+        }
+
+        stage('Push merged target branch') {
+            when {
+                expression {
+                    def branch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: ""
+                    branch = branch.replaceFirst(/^origin\//, "")
+                    return branch.startsWith("feat/")
+                }
+            }
+            steps {
+                withCredentials([usernamePassword(credentialsId: env.GIT_CREDENTIALS_ID,
+                                                 usernameVariable: 'GIT_USER',
+                                                 passwordVariable: 'GIT_PASS')]) {
+                    sh """
+                      git push https://$GIT_USER:$GIT_PASS@github.com/RahulVervebot/go_cicd_demo.git ${TARGET_BRANCH}
+                    """
+                }
+            }
+        }
+    }
+
+    post {
+
+        // Only send success email if it was a feat/* branch
+        success {
+            script {
+                def branch = env.EFFECTIVE_BRANCH ?: (env.BRANCH_NAME ?: env.GIT_BRANCH ?: "unknown")
+                branch = branch.replaceFirst(/^origin\//, "")
+                if (!branch.startsWith("feat/")) {
+                    return
+                }
+
+                emailext(
+                    to: "${ADMIN_EMAIL}",
+                    subject: "Auto-merge SUCCESS: ${branch} -> ${TARGET_BRANCH}",
+                    body: """\
+Auto-merge completed successfully.
 
 Feature branch: ${branch}
 Target branch:  ${TARGET_BRANCH}
@@ -172,52 +133,57 @@ Target branch:  ${TARGET_BRANCH}
 Job:   ${env.JOB_NAME}
 Build: #${env.BUILD_NUMBER}
 
-Console: ${env.BUILD_URL}console
+The changes from ${branch} have been merged into ${TARGET_BRANCH} and pushed to GitHub.
 """
-        )
-      }
-    }
-
-    failure {
-      script {
-        def branch = (env.EFFECTIVE_BRANCH ?: env.BRANCH_NAME ?: env.GIT_BRANCH ?: "unknown")
-        branch = branch.replaceFirst(/^origin\//, "")
-   
-        def mergeOutput  = fileExists('merge_output.txt')  ? readFile('merge_output.txt')  : ""
-        def rebaseOutput = fileExists('rebase_output.txt') ? readFile('rebase_output.txt') : ""
-
-        def authorEmail = ""
-        try {
-          authorEmail = sh(script: "git log -1 --pretty=format:%ae || true", returnStdout: true).trim()
-        } catch (e) {
-          authorEmail = ""
+                )
+            }
         }
 
-      def dev = (env.DEVELOPER_EMAIL ?: "").trim()
-        def recipients = dev ? "${ADMIN_EMAIL}, ${dev}" : "${ADMIN_EMAIL}"
-        if (authorEmail) recipients = "${recipients}, ${authorEmail}"
+        failure {
+            script {
+                def branch = env.EFFECTIVE_BRANCH ?: (env.BRANCH_NAME ?: env.GIT_BRANCH ?: "unknown")
+                branch = branch.replaceFirst(/^origin\//, "")
+                if (!branch.startsWith("feat/")) {
+                    return
+                }
 
-        emailext(
-          to: recipients,
-          subject: "Jenkins FAILED: ${branch} (target: ${TARGET_BRANCH})",
-          body: """Build failed.
+                // Capture merge error / conflict details, if available
+                def mergeOutput = ""
+                if (fileExists('merge_output.txt')) {
+                    mergeOutput = readFile('merge_output.txt')
+                }
 
-Branch: ${branch}
-Target: ${TARGET_BRANCH}
+                // Get last commit author's email (the user who pushed)
+                def authorEmail = sh(
+                    script: "git log -1 --pretty=format:'%ae' || echo ''",
+                    returnStdout: true
+                ).trim()
+
+                // Send to admin + committer if we have their email
+                def recipients = "${ADMIN_EMAIL}"
+                if (authorEmail) {
+                    recipients = "${recipients}, ${authorEmail}"
+                }
+
+                emailext(
+                    to: recipients,
+                    subject: "Auto-merge FAILED for branch ${branch}",
+                    body: """\
+Auto-merge failed for:
+
+Feature branch: ${branch}
+Target branch:  ${TARGET_BRANCH}
 
 Job:   ${env.JOB_NAME}
 Build: #${env.BUILD_NUMBER}
 
---- Rebase output ---
-${rebaseOutput}
+Reason (git output):
 
---- Merge output ---
 ${mergeOutput}
-
-Console: ${env.BUILD_URL}console
 """
-        )
-      }
+                )
+            }
+        }
     }
-  }
+
 }
