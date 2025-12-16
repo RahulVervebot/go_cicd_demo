@@ -31,7 +31,9 @@ pipeline {
 
     stage('Checkout') {
       when { expression { (env.EFFECTIVE_BRANCH ?: "").startsWith("feat/") } }
-      steps { checkout scm }
+      steps {
+        checkout scm
+      }
     }
 
   stage('Capture developer email') {
