@@ -92,7 +92,6 @@ stage('Capture developer email') {
         returnStdout: true
       ).trim()
 
-      // fallback to committer email if author email is blank
       if (!devEmail) {
         devEmail = sh(
           script: "git show -s --format=%ce origin/${env.EFFECTIVE_BRANCH} || true",
