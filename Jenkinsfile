@@ -79,6 +79,31 @@ stage('Attempt merge into main') {
     """
   }
 }
+stage('Capture developer email') {
+  when { expression { (env.EFFECTIVE_BRANCH ?: "").startsWith("feat/") } }
+  steps {
+    script {
+      // make sure remote refs exist
+      sh "git fetch origin +refs/heads/*:refs/remotes/origin/*"
+
+      // email from the latest commit on the feature branch (NOT from main / NOT from jenkins merge commit)
+      def devEmail = sh(
+        script: "git show -s --format=%ae origin/${env.EFFECTIVE_BRANCH} || true",
+        returnStdout: true
+      ).trim()
+
+      if (!devEmail) {
+        devEmail = sh(
+          script: "git show -s --format=%ce origin/${env.EFFECTIVE_BRANCH} || true",
+          returnStdout: true
+        ).trim()
+      }
+
+      env.DEVELOPER_EMAIL = devEmail
+      echo "Developer email captured from origin/${env.EFFECTIVE_BRANCH}: ${env.DEVELOPER_EMAIL}"
+    }
+  }
+}
 
 
     stage('Push main') {
@@ -132,8 +157,8 @@ EOF
         } catch (e) {
           authorEmail = ""
         }
-
-        def recipients = "${ADMIN_EMAIL}"
+        def dev = (env.DEVELOPER_EMAIL ?: "").trim()
+        def recipients = dev ? "${ADMIN_EMAIL}, ${dev}" : "${ADMIN_EMAIL}"
         if (authorEmail) recipients = "${recipients}, ${authorEmail}"
 
         emailext(
@@ -157,7 +182,7 @@ Console: ${env.BUILD_URL}console
       script {
         def branch = (env.EFFECTIVE_BRANCH ?: env.BRANCH_NAME ?: env.GIT_BRANCH ?: "unknown")
         branch = branch.replaceFirst(/^origin\//, "")
-
+   
         def mergeOutput  = fileExists('merge_output.txt')  ? readFile('merge_output.txt')  : ""
         def rebaseOutput = fileExists('rebase_output.txt') ? readFile('rebase_output.txt') : ""
 
@@ -168,7 +193,8 @@ Console: ${env.BUILD_URL}console
           authorEmail = ""
         }
 
-        def recipients = "${ADMIN_EMAIL}"
+      def dev = (env.DEVELOPER_EMAIL ?: "").trim()
+        def recipients = dev ? "${ADMIN_EMAIL}, ${dev}" : "${ADMIN_EMAIL}"
         if (authorEmail) recipients = "${recipients}, ${authorEmail}"
 
         emailext(
