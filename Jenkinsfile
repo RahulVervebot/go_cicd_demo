@@ -79,6 +79,32 @@ stage('Attempt merge into main') {
     """
   }
 }
+stage('Capture developer email') {
+  when { expression { (env.EFFECTIVE_BRANCH ?: "").startsWith("feat/") } }
+  steps {
+    script {
+      // make sure remote refs exist
+      sh "git fetch origin +refs/heads/*:refs/remotes/origin/*"
+
+      // email from the latest commit on the feature branch (NOT from main / NOT from jenkins merge commit)
+      def devEmail = sh(
+        script: "git show -s --format=%ae origin/${env.EFFECTIVE_BRANCH} || true",
+        returnStdout: true
+      ).trim()
+
+      // fallback to committer email if author email is blank
+      if (!devEmail) {
+        devEmail = sh(
+          script: "git show -s --format=%ce origin/${env.EFFECTIVE_BRANCH} || true",
+          returnStdout: true
+        ).trim()
+      }
+
+      env.DEVELOPER_EMAIL = devEmail
+      echo "Developer email captured from origin/${env.EFFECTIVE_BRANCH}: ${env.DEVELOPER_EMAIL}"
+    }
+  }
+}
 
 
     stage('Push main') {
