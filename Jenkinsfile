@@ -1,6 +1,6 @@
 pipeline {
   agent any
-
+  
   environment {
     TARGET_BRANCH      = "main"
     GIT_CREDENTIALS_ID = "6f9dfd84-7cc3-412e-8c73-b6c8bd1a3291"
