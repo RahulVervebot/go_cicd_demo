@@ -225,9 +225,8 @@ Console: ${env.BUILD_URL}console
 
         emailext(
           to: recipients,
-          subject: "Jenkins FAILED: ${branch} (target: ${TARGET_BRANCH})",
-          body: bodyText,
-          debug: true
+          subject: "Jenkins FAILED With Error: ${branch} (target: ${TARGET_BRANCH})",
+          body: bodyText
         )
       }
     }
