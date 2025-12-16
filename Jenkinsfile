@@ -35,11 +35,11 @@ pipeline {
     stage('Run tests') {
       when { expression { (env.EFFECTIVE_BRANCH ?: "").startsWith("feat/") } }
       steps {
-        sh '''
-          set -e
+        sh '''#!/bin/bash -eo pipefail
           if [ -f go.mod ]; then
             echo "go.mod found; running: go test ./..."
-            go test ./...
+            rm -f test_output.txt
+            go test ./... | tee test_output.txt
           else
             echo "go.mod not found; skipping tests (recommended: add go.mod and enable go test ./...)"
           fi
@@ -165,25 +165,25 @@ Console: ${env.BUILD_URL}console
         def mailArgs = [
           to: recipients,
           subject: "Jenkins SUCCESS: ${branch} merged into ${TARGET_BRANCH}",
-          body: bodyText,
-          debug: true
+          body: bodyText
         ]
 
         if (env.FROM_EMAIL?.trim()) {
           mailArgs.from = env.FROM_EMAIL.trim()
         }
 
-        emailext(mailArgs)
+        emailext mailArgs
       }
     }
 
-    failure {
+    unsuccessful {
       script {
         def branch = (env.EFFECTIVE_BRANCH ?: env.BRANCH_NAME ?: env.GIT_BRANCH ?: "unknown")
         branch = branch.replaceFirst(/^origin\//, "")
 
         def mergeOutput  = fileExists('merge_output.txt')  ? readFile('merge_output.txt')  : ""
         def rebaseOutput = fileExists('rebase_output.txt') ? readFile('rebase_output.txt') : ""
+        def testOutput   = fileExists('test_output.txt')   ? readFile('test_output.txt')   : ""
 
         def authorEmail = ""
         try {
@@ -209,21 +209,23 @@ ${rebaseOutput}
 --- Merge output ---
 ${mergeOutput}
 
+--- Test output ---
+${testOutput}
+
 Console: ${env.BUILD_URL}console
 """
 
         def mailArgs = [
           to: recipients,
-          subject: "Jenkins FAILED: ${branch} (target: ${TARGET_BRANCH})",
-          body: bodyText,
-          debug: true
+          subject: "Jenkins ${currentBuild.currentResult}: ${branch} (target: ${TARGET_BRANCH})",
+          body: bodyText
         ]
 
         if (env.FROM_EMAIL?.trim()) {
           mailArgs.from = env.FROM_EMAIL.trim()
         }
 
-        emailext(mailArgs)
+        emailext mailArgs
       }
     }
   }
