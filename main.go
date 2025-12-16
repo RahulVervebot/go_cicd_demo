@@ -13,7 +13,6 @@ func main() {
 
 	prod := multiply(a, b)
 	fmt.Printf("Mul: %d * %d = %d\n", a, b, prod)
-  fmt.Printf("Sub: %d - %d = %d\n", a, b, subtract)
 }
 
 func add(a, b int) int {
