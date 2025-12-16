@@ -10,9 +10,12 @@ func main() {
 
 	diff := subtract(a, b)
 	fmt.Printf("Sub: %d - %d = %d\n", a, b, diff)
+<<<<<<< HEAD
 
 	prod := multiply(a, b)
 	fmt.Printf("Mul: %d * %d = %d\n", a, b, prod)
+=======
+>>>>>>> main
 }
 
 func add(a, b int) int {
@@ -22,8 +25,11 @@ func add(a, b int) int {
 func subtract(a, b int) int {
 	return a - b
 }
+<<<<<<< HEAD
 // this is new change
 func multiply(a, b int) int {
 	return a * b
 }
 
+=======
+>>>>>>> main
