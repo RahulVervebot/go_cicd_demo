@@ -37,8 +37,7 @@ pipeline {
     stage('Run tests') {
       when { expression { (env.EFFECTIVE_BRANCH ?: "").startsWith("feat/") } }
       steps {
-        // If go.mod exists -> run full tests
-        // If go.mod missing -> skip tests (so merge pipeline can still run)
+
         sh '''
           set -e
           if [ -f go.mod ]; then
@@ -51,61 +50,36 @@ pipeline {
       }
     }
 
-    stage('Rebase feature onto latest main') {
-      when { expression { (env.EFFECTIVE_BRANCH ?: "").startsWith("feat/") } }
-      steps {
-        sh """
-          set -e
-          git config user.name "jenkins-bot"
-          git config user.email "jenkins-bot@example.com"
 
-          git fetch origin
 
-          # Ensure we are on the feature branch locally
-          git checkout -B ${env.EFFECTIVE_BRANCH} origin/${env.EFFECTIVE_BRANCH}
+stage('Attempt merge into main') {
+  when { expression { (env.EFFECTIVE_BRANCH ?: "").startsWith("feat/") } }
+  steps {
+    sh """
+      set -e
+      git config user.name "jenkins-bot"
+      git config user.email "jenkins-bot@example.com"
 
-          # Rebase feature branch onto latest main (like: git pull --rebase origin main)
-          set +e
-          git rebase origin/${TARGET_BRANCH} > rebase_output.txt 2>&1
-          REBASE_STATUS=\$?
-          set -e
+      git fetch origin
 
-          if [ "\$REBASE_STATUS" -ne 0 ]; then
-            echo "Rebase conflict detected!"
-            git rebase --abort || true
-            exit 98
-          fi
-        """
-      }
-    }
+      # checkout latest main
+      git checkout -B ${TARGET_BRANCH} origin/${TARGET_BRANCH}
 
-    stage('Merge rebased feature into main') {
-      when { expression { (env.EFFECTIVE_BRANCH ?: "").startsWith("feat/") } }
-      steps {
-        sh """
-          set -e
-          git fetch origin
+      # try merge feature
+      set +e
+      git merge --no-ff origin/${env.EFFECTIVE_BRANCH} > merge_output.txt 2>&1
+      MERGE_STATUS=\$?
+      set -e
 
-          # Checkout latest main
-          git checkout -B ${TARGET_BRANCH} origin/${TARGET_BRANCH}
+      if [ "\$MERGE_STATUS" -ne 0 ]; then
+        echo "Merge conflict detected!"
+        git merge --abort || true
+        exit 99
+      fi
+    """
+  }
+}
 
-          # Merge the (rebased) feature branch into main
-          set +e
-          git merge --no-ff ${env.EFFECTIVE_BRANCH} > merge_output.txt 2>&1
-          MERGE_STATUS=\$?
-          set -e
-
-          if [ "\$MERGE_STATUS" -ne 0 ]; then
-            echo "Merge conflict detected!"
-            git merge --abort || true
-            exit 99
-          fi
-
-          echo "Merge commit:"
-          git log -1 --oneline
-        """
-      }
-    }
 
     stage('Push main') {
       when { expression { (env.EFFECTIVE_BRANCH ?: "").startsWith("feat/") } }
