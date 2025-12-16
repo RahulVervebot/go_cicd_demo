@@ -3,10 +3,10 @@ pipeline {
 
   environment {
     TARGET_BRANCH      = "main"
-    // ✅ IMPORTANT: no trailing spaces/tabs in credentials id
     GIT_CREDENTIALS_ID = "6f9dfd84-7cc3-412e-8c73-b6c8bd1a3291"
     ADMIN_EMAIL        = "rahul.singhh.144@gmail.com"
     REPO_URL           = "https://github.com/RahulVervebot/go_cicd_demo.git"
+    FROM_EMAIL         = "" // optional: set same as your SMTP login, e.g. "yourgmail@gmail.com"
   }
 
   options {
@@ -29,16 +29,12 @@ pipeline {
 
     stage('Checkout') {
       when { expression { (env.EFFECTIVE_BRANCH ?: "").startsWith("feat/") } }
-      steps {
-        checkout scm
-      }
+      steps { checkout scm }
     }
 
     stage('Run tests') {
       when { expression { (env.EFFECTIVE_BRANCH ?: "").startsWith("feat/") } }
       steps {
-        // If go.mod exists -> run full tests
-        // If go.mod missing -> skip tests (so merge pipeline can still run)
         sh '''
           set -e
           if [ -f go.mod ]; then
@@ -61,10 +57,8 @@ pipeline {
 
           git fetch origin
 
-          # Ensure we are on the feature branch locally
           git checkout -B ${env.EFFECTIVE_BRANCH} origin/${env.EFFECTIVE_BRANCH}
 
-          # Rebase feature branch onto latest main (like: git pull --rebase origin main)
           set +e
           git rebase origin/${TARGET_BRANCH} > rebase_output.txt 2>&1
           REBASE_STATUS=\$?
@@ -86,10 +80,8 @@ pipeline {
           set -e
           git fetch origin
 
-          # Checkout latest main
           git checkout -B ${TARGET_BRANCH} origin/${TARGET_BRANCH}
 
-          # Merge the (rebased) feature branch into main
           set +e
           git merge --no-ff ${env.EFFECTIVE_BRANCH} > merge_output.txt 2>&1
           MERGE_STATUS=\$?
@@ -118,7 +110,6 @@ pipeline {
           sh '''
             set -e
 
-            # Askpass helper so secrets aren't injected into the URL
             cat > .git_askpass.sh <<'EOF'
 #!/bin/sh
 case "$1" in
@@ -132,9 +123,7 @@ EOF
             export GIT_ASKPASS="$PWD/.git_askpass.sh"
             export GIT_TERMINAL_PROMPT=0
 
-            # Keep remote clean (no creds in URL)
             git remote set-url origin "$REPO_URL"
-
             git push origin main
 
             rm -f .git_askpass.sh
@@ -151,7 +140,7 @@ EOF
         def branch = (env.EFFECTIVE_BRANCH ?: env.BRANCH_NAME ?: env.GIT_BRANCH ?: "unknown")
         branch = branch.replaceFirst(/^origin\//, "")
 
-        // committer email (developer)
+        // Developer email (last commit author)
         def authorEmail = ""
         try {
           authorEmail = sh(script: "git log -1 --pretty=format:%ae || true", returnStdout: true).trim()
@@ -162,10 +151,7 @@ EOF
         def recipients = "${ADMIN_EMAIL}"
         if (authorEmail) recipients = "${recipients}, ${authorEmail}"
 
-        emailext(
-          to: recipients,
-          subject: "Jenkins SUCCESS: ${branch} merged into ${TARGET_BRANCH}",
-          body: """Build & merge successful.
+        def bodyText = """Build & merge successful.
 
 Feature branch: ${branch}
 Target branch:  ${TARGET_BRANCH}
@@ -175,7 +161,19 @@ Build: #${env.BUILD_NUMBER}
 
 Console: ${env.BUILD_URL}console
 """
-        )
+
+        def mailArgs = [
+          to: recipients,
+          subject: "Jenkins SUCCESS: ${branch} merged into ${TARGET_BRANCH}",
+          body: bodyText,
+          debug: true
+        ]
+
+        if (env.FROM_EMAIL?.trim()) {
+          mailArgs.from = env.FROM_EMAIL.trim()
+        }
+
+        emailext(mailArgs)
       }
     }
 
@@ -197,10 +195,7 @@ Console: ${env.BUILD_URL}console
         def recipients = "${ADMIN_EMAIL}"
         if (authorEmail) recipients = "${recipients}, ${authorEmail}"
 
-        emailext(
-          to: recipients,
-          subject: "Jenkins FAILED: ${branch} (target: ${TARGET_BRANCH})",
-          body: """Build failed.
+        def bodyText = """Build failed.
 
 Branch: ${branch}
 Target: ${TARGET_BRANCH}
@@ -216,7 +211,19 @@ ${mergeOutput}
 
 Console: ${env.BUILD_URL}console
 """
-        )
+
+        def mailArgs = [
+          to: recipients,
+          subject: "Jenkins FAILED: ${branch} (target: ${TARGET_BRANCH})",
+          body: bodyText,
+          debug: true
+        ]
+
+        if (env.FROM_EMAIL?.trim()) {
+          mailArgs.from = env.FROM_EMAIL.trim()
+        }
+
+        emailext(mailArgs)
       }
     }
   }
