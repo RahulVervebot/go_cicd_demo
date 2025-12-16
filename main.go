@@ -14,4 +14,14 @@ func add(a, b int) int {
 }
 func subtract(a, b int) int {
 	return a - b
+<<<<<<< HEAD
 }
+=======
+
+}
+// check
+func multiply(a, b int) int {
+	return a * b
+}
+
+>>>>>>> feat/add-mul
