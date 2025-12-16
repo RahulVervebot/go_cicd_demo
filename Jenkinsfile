@@ -172,11 +172,11 @@ Console: ${env.BUILD_URL}console
           mailArgs.from = env.FROM_EMAIL.trim()
         }
 
-        emailext mailArgs
+        emailext(mailArgs)
       }
     }
 
-    unsuccessful {
+    failure {
       script {
         def branch = (env.EFFECTIVE_BRANCH ?: env.BRANCH_NAME ?: env.GIT_BRANCH ?: "unknown")
         branch = branch.replaceFirst(/^origin\//, "")
@@ -225,7 +225,61 @@ Console: ${env.BUILD_URL}console
           mailArgs.from = env.FROM_EMAIL.trim()
         }
 
-        emailext mailArgs
+        emailext(mailArgs)
+      }
+    }
+
+    unstable {
+      script {
+        // Reuse the failure path so unstable builds also notify admins/developers.
+        def branch = (env.EFFECTIVE_BRANCH ?: env.BRANCH_NAME ?: env.GIT_BRANCH ?: "unknown")
+        branch = branch.replaceFirst(/^origin\//, "")
+
+        def mergeOutput  = fileExists('merge_output.txt')  ? readFile('merge_output.txt')  : ""
+        def rebaseOutput = fileExists('rebase_output.txt') ? readFile('rebase_output.txt') : ""
+        def testOutput   = fileExists('test_output.txt')   ? readFile('test_output.txt')   : ""
+
+        def authorEmail = ""
+        try {
+          authorEmail = sh(script: "git log -1 --pretty=format:%ae || true", returnStdout: true).trim()
+        } catch (e) {
+          authorEmail = ""
+        }
+
+        def recipients = "${ADMIN_EMAIL}"
+        if (authorEmail) recipients = "${recipients}, ${authorEmail}"
+
+        def bodyText = """Build result: ${currentBuild.currentResult}.
+
+Branch: ${branch}
+Target: ${TARGET_BRANCH}
+
+Job:   ${env.JOB_NAME}
+Build: #${env.BUILD_NUMBER}
+
+--- Rebase output ---
+${rebaseOutput}
+
+--- Merge output ---
+${mergeOutput}
+
+--- Test output ---
+${testOutput}
+
+Console: ${env.BUILD_URL}console
+"""
+
+        def mailArgs = [
+          to: recipients,
+          subject: "Jenkins ${currentBuild.currentResult}: ${branch} (target: ${TARGET_BRANCH})",
+          body: bodyText
+        ]
+
+        if (env.FROM_EMAIL?.trim()) {
+          mailArgs.from = env.FROM_EMAIL.trim()
+        }
+
+        emailext(mailArgs)
       }
     }
   }
