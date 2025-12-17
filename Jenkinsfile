@@ -7,7 +7,6 @@ pipeline {
     ADMIN_EMAIL        = "isabella1010111@gmail.com"
     REPO_URL           = "https://github.com/RahulVervebot/go_cicd_demo.git"
 
-    // Fallback if git author email can't be detected
     DEFAULT_DEV_EMAIL  = "therahulsinghshekhawat@gmail.com"
   }
 
