@@ -22,8 +22,7 @@ func subtract(a, b int) int {
 func multiply(a, b int) int {
 	return a * b
 }
-
-// changes
+// we have to test updated
 func divide(a, b int) int {
 	return a / b
 }
