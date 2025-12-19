@@ -26,7 +26,7 @@ func subtract(a, b int) int {
 func multiply(a, b int) int {
 	return a * b
 }
-// we have to test div section
+// we have to test updated after update
 func divide(a, b int) int {
 	return a / b
 }
