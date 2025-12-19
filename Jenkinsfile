@@ -4,10 +4,9 @@ pipeline {
   environment {
     TARGET_BRANCH      = "main"
     GIT_CREDENTIALS_ID = "6f9dfd84-7cc3-412e-8c73-b6c8bd1a3291"
-    ADMIN_EMAIL        = "isabella1010111@gmail.com"
+    ADMIN_EMAIL        = "rahul.singhh.144@gmail.com"
     REPO_URL           = "https://github.com/RahulVervebot/go_cicd_demo.git"
-
-    DEFAULT_DEV_EMAIL  = "therahulsinghshekhawat@gmail.com"
+    FROM_EMAIL         = "" // optional: set same as your SMTP login, e.g. "yourgmail@gmail.com"
   }
 
   options {
@@ -66,13 +65,13 @@ pipeline {
     stage('Run tests') {
       when { expression { (env.EFFECTIVE_BRANCH ?: "").startsWith("feat/") } }
       steps {
-        sh '''
-          set -e
+        sh '''#!/bin/bash -eo pipefail
           if [ -f go.mod ]; then
             echo "go.mod found; running: go test ./..."
-            go test ./...
+            rm -f test_output.txt
+            go test ./... | tee test_output.txt
           else
-            echo "go.mod not found; skipping tests"
+            echo "go.mod not found; skipping tests (recommended: add go.mod and enable go test ./...)"
           fi
         '''
       }
@@ -82,47 +81,72 @@ pipeline {
     stage('Rebase feature onto latest main') {
       when { expression { (env.EFFECTIVE_BRANCH ?: "").startsWith("feat/") } }
       steps {
-        sh """
-          set -e
-          git config user.name "jenkins-bot"
-          git config user.email "jenkins-bot@example.com"
+        script {
+          int status = sh(
+            script: """#!/bin/bash -e
+git config user.name "jenkins-bot"
+git config user.email "jenkins-bot@example.com"
 
-          git fetch origin
-          git checkout -B ${env.EFFECTIVE_BRANCH} origin/${env.EFFECTIVE_BRANCH}
+git fetch origin
 
-          set +e
-          git rebase origin/${TARGET_BRANCH} > rebase_output.txt 2>&1
-          REBASE_STATUS=\$?
-          set -e
+git checkout -B ${env.EFFECTIVE_BRANCH} origin/${env.EFFECTIVE_BRANCH}
 
-          if [ "\$REBASE_STATUS" -ne 0 ]; then
-            echo "Rebase conflict detected!"
-            git rebase --abort || true
-            exit 98
-          fi
-        """
+set +e
+git rebase origin/${TARGET_BRANCH} > rebase_output.txt 2>&1
+REBASE_STATUS=\$?
+set -e
+
+if [ "\$REBASE_STATUS" -ne 0 ]; then
+  echo "Rebase conflict detected!"
+  git rebase --abort || true
+  exit 98
+fi
+""",
+            returnStatus: true
+          )
+
+          if (status == 98) {
+            error("Rebase conflict detected between ${env.EFFECTIVE_BRANCH} and ${TARGET_BRANCH}. See rebase_output.txt for details.")
+          } else if (status != 0) {
+            error("Rebase stage failed with exit code ${status}")
+          }
+        }
       }
     }
 
     stage('Merge into main') {
       when { expression { (env.EFFECTIVE_BRANCH ?: "").startsWith("feat/") } }
       steps {
-        sh """
-          set -e
-          git fetch origin
-          git checkout -B ${TARGET_BRANCH} origin/${TARGET_BRANCH}
+        script {
+          int status = sh(
+            script: """#!/bin/bash -e
+git fetch origin
 
-          set +e
-          git merge --no-ff ${env.EFFECTIVE_BRANCH} > merge_output.txt 2>&1
-          MERGE_STATUS=\$?
-          set -e
+git checkout -B ${TARGET_BRANCH} origin/${TARGET_BRANCH}
 
-          if [ "\$MERGE_STATUS" -ne 0 ]; then
-            echo "Merge conflict detected!"
-            git merge --abort || true
-            exit 99
-          fi
-        """
+set +e
+git merge --no-ff ${env.EFFECTIVE_BRANCH} > merge_output.txt 2>&1
+MERGE_STATUS=\$?
+set -e
+
+if [ "\$MERGE_STATUS" -ne 0 ]; then
+  echo "Merge conflict detected!"
+  git merge --abort || true
+  exit 99
+fi
+
+echo "Merge commit:"
+git log -1 --oneline
+""",
+            returnStatus: true
+          )
+
+          if (status == 99) {
+            error("Merge conflict detected when merging ${env.EFFECTIVE_BRANCH} into ${TARGET_BRANCH}. See merge_output.txt for details.")
+          } else if (status != 0) {
+            error("Merge stage failed with exit code ${status}")
+          }
+        }
       }
     }
 
@@ -167,16 +191,21 @@ EOF
         def branch = (env.EFFECTIVE_BRANCH ?: env.BRANCH_NAME ?: env.GIT_BRANCH ?: "unknown")
         branch = branch.replaceFirst(/^origin\//, "")
 
-       def dev = (env.DEVELOPER_EMAIL ?: "").trim()
-def recipients = dev ? "${ADMIN_EMAIL}, ${dev}" : "${ADMIN_EMAIL}"
+        // Developer email (last commit author)
+        def authorEmail = ""
+        try {
+          authorEmail = sh(script: "git log -1 --pretty=format:%ae || true", returnStdout: true).trim()
+        } catch (e) {
+          authorEmail = ""
+        }
+
+        def recipients = "${ADMIN_EMAIL}"
+        if (authorEmail) recipients = "${recipients}, ${authorEmail}"
 
         def bodyText = """Build & merge successful.
 
 Feature branch: ${branch}
 Target branch:  ${TARGET_BRANCH}
-
-Admin: ${env.ADMIN_EMAIL}
-Developer: ${dev}
 
 Job:   ${env.JOB_NAME}
 Build: #${env.BUILD_NUMBER}
@@ -184,12 +213,17 @@ Build: #${env.BUILD_NUMBER}
 Console: ${env.BUILD_URL}console
 """
 
-        emailext(
+        def mailArgs = [
           to: recipients,
           subject: "Jenkins SUCCESS: ${branch} merged into ${TARGET_BRANCH}",
-          body: bodyText,
-          debug: true
-        )
+          body: bodyText
+        ]
+
+        if (env.FROM_EMAIL?.trim()) {
+          mailArgs.from = env.FROM_EMAIL.trim()
+        }
+
+        emailext(mailArgs)
       }
     }
 
@@ -200,17 +234,22 @@ Console: ${env.BUILD_URL}console
 
         def mergeOutput  = fileExists('merge_output.txt')  ? readFile('merge_output.txt')  : ""
         def rebaseOutput = fileExists('rebase_output.txt') ? readFile('rebase_output.txt') : ""
+        def testOutput   = fileExists('test_output.txt')   ? readFile('test_output.txt')   : ""
 
-      def dev = (env.DEVELOPER_EMAIL ?: "").trim()
-def recipients = dev ? "${ADMIN_EMAIL}, ${dev}" : "${ADMIN_EMAIL}"
+        def authorEmail = ""
+        try {
+          authorEmail = sh(script: "git log -1 --pretty=format:%ae || true", returnStdout: true).trim()
+        } catch (e) {
+          authorEmail = ""
+        }
+
+        def recipients = "${ADMIN_EMAIL}"
+        if (authorEmail) recipients = "${recipients}, ${authorEmail}"
 
         def bodyText = """Build failed.
 
 Branch: ${branch}
 Target: ${TARGET_BRANCH}
-
-Admin: ${env.ADMIN_EMAIL}
-Developer: ${dev}
 
 Job:   ${env.JOB_NAME}
 Build: #${env.BUILD_NUMBER}
@@ -221,14 +260,77 @@ ${rebaseOutput}
 --- Merge output ---
 ${mergeOutput}
 
+--- Test output ---
+${testOutput}
+
 Console: ${env.BUILD_URL}console
 """
 
-        emailext(
+        def mailArgs = [
           to: recipients,
-          subject: "Jenkins FAILED With Error: ${branch} (target: ${TARGET_BRANCH})",
+          subject: "Jenkins ${currentBuild.currentResult}: ${branch} (target: ${TARGET_BRANCH})",
           body: bodyText
-        )
+        ]
+
+        if (env.FROM_EMAIL?.trim()) {
+          mailArgs.from = env.FROM_EMAIL.trim()
+        }
+
+        emailext(mailArgs)
+      }
+    }
+
+    unstable {
+      script {
+        // Reuse the failure path so unstable builds also notify admins/developers.
+        def branch = (env.EFFECTIVE_BRANCH ?: env.BRANCH_NAME ?: env.GIT_BRANCH ?: "unknown")
+        branch = branch.replaceFirst(/^origin\//, "")
+
+        def mergeOutput  = fileExists('merge_output.txt')  ? readFile('merge_output.txt')  : ""
+        def rebaseOutput = fileExists('rebase_output.txt') ? readFile('rebase_output.txt') : ""
+        def testOutput   = fileExists('test_output.txt')   ? readFile('test_output.txt')   : ""
+
+        def authorEmail = ""
+        try {
+          authorEmail = sh(script: "git log -1 --pretty=format:%ae || true", returnStdout: true).trim()
+        } catch (e) {
+          authorEmail = ""
+        }
+
+        def recipients = "${ADMIN_EMAIL}"
+        if (authorEmail) recipients = "${recipients}, ${authorEmail}"
+
+        def bodyText = """Build result: ${currentBuild.currentResult}.
+
+Branch: ${branch}
+Target: ${TARGET_BRANCH}
+
+Job:   ${env.JOB_NAME}
+Build: #${env.BUILD_NUMBER}
+
+--- Rebase output ---
+${rebaseOutput}
+
+--- Merge output ---
+${mergeOutput}
+
+--- Test output ---
+${testOutput}
+
+Console: ${env.BUILD_URL}console
+"""
+
+        def mailArgs = [
+          to: recipients,
+          subject: "Jenkins ${currentBuild.currentResult}: ${branch} (target: ${TARGET_BRANCH})",
+          body: bodyText
+        ]
+
+        if (env.FROM_EMAIL?.trim()) {
+          mailArgs.from = env.FROM_EMAIL.trim()
+        }
+
+        emailext(mailArgs)
       }
     }
   }
