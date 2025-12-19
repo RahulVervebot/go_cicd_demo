@@ -23,3 +23,7 @@ func subtract(a, b int) int {
 func multiply(a, b int) int {
 	return a * b
 }
+
+func divide(a, b int) int {
+	return a / b
+}
