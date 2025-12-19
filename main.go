@@ -20,11 +20,11 @@ func subtract(a, b int) int {
 	return a - b
 }
 
-// changes
 func multiply(a, b int) int {
 	return a * b
 }
 
+// changes
 func divide(a, b int) int {
 	return a / b
 }
