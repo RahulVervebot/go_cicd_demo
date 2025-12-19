@@ -6,7 +6,7 @@ pipeline {
     GIT_CREDENTIALS_ID = "6f9dfd84-7cc3-412e-8c73-b6c8bd1a3291"
     ADMIN_EMAIL        = "rahul.singhh.144@gmail.com"
     REPO_URL           = "https://github.com/RahulVervebot/go_cicd_demo.git"
-    FROM_EMAIL         = "" // optional: set same as your SMTP login, e.g. "yourgmail@gmail.com"
+    FROM_EMAIL         = "rahul.singhh.144@gmail.com" // optional: set same as your SMTP login, e.g. "yourgmail@gmail.com"
   }
 
   options {
