@@ -7,9 +7,11 @@ func main() {
 	sum := add(a, b)
 	subtract := subtract(a, b)
 	multiply := multiply(a, b)
+	Divide := divide(a, b)
 	fmt.Printf("Add: %d + %d = %d\n", a, b, sum)
 	fmt.Printf("Sub: %d - %d = %d\n", a, b, subtract)
 	fmt.Printf("Mul: %d * %d = %d\n", a, b, multiply)
+	fmt.Printf("Div: %d / %d = %d\n", a, b, Divide)
 }
 
 func add(a, b int) int {
